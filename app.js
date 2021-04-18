@@ -1,144 +1,118 @@
-var option = "";
-var dataSet ;
+var samplesJson = "samples.json"
 
+var idSelect = d3.select("#selDataset"); //dropdown menu
+var demoTable = d3.select("#sample-metadata"); //demographics table
+var barChart = d3.select("#bar"); //barchart
+var bubbleChart = d3.select("#bubble"); //bubblechart
 
 function init() {
 
-  d3.json("samples.json").then(function(data){
-    dataSet = data;
-
-    console.log(dataSet);
+  d3.json(samplesJson).then(data => {
     
-    displayMetaData(940,dataSet);
-    displayHBarChart(940,dataSet);
-    displayBubbleChart(940,dataSet);
+    data.names.forEach(name => {
+      var option = idSelect.append("option");
+      option.text(name);
+      }); //close forEach
 
-    var optionMenu = d3.select("#selDataset");
+   var initId = idSelect.property("value")
+   plotCharts(initId);
 
-    data.names.forEach(function(name){
-      optionMenu.append("option").text(name);
+  }); //then  
+}  //close init
+
+function plotCharts(id) {
+
+  resetHtml(); //clear html to prevent multiple IDs showing on top of each other
+
+  //this builds the demographic info table
+  d3.json(samplesJson).then(data => {
+    var individualMetadata = data.metadata.filter(participant => participant.id == id)[0]; //must use square brackets to call the data from the list
+
+    Object.entries(individualMetadata).forEach(([key, value]) => {
+      var demolist = demoTable.append("ul")
+        .attr("class","list-group");
+      var listItem = demolist.append("li")
+        //.attr("class", "list-group-item")
+        .attr("style", "list-style-type: none");
+      listItem.text(`${key}: ${value}`);
     });
- })
-}
 
-function unpack(rows, index) {
-    return rows.map(function(row) {
-      return row[index];
-    });
-  }
-
-function optionChanged(value) {
-    option = value;
-    displayMetaData(option,dataSet);
-    displayHBarChart(option,dataSet);
-    displayBubbleChart(option,dataSet);
-}
-
-function displayMetaData(option,dataSet) {
+    //filter the samples.json file for the drop down selection
+    var individualSample = data.samples.filter(sample => sample.id == id)[0];
     
+    //values for trace (x axis)
+    var sampleValues = []
+      sampleValues.push(individualSample.sample_values);
+      var top1Ootusamples = sampleValues[0].slice(0, 10).reverse();
     
-    var mtdata = dataSet.metadata.filter(row => row.id == option);
-    d3.select("#sample-metadata").html(displayObject(mtdata[0]));
-        
-}
+    //values for trace (y axis)
+    var otuIDs = []
+      otuIDs.push(individualSample.otu_ids);
+      var top1OotuIDs = otuIDs[0].slice(0, 10).reverse();
 
-function displayObject(obj) {
-    var str = "";
-    Object.entries(obj).forEach(([key,value]) => {
-        str += `<br>${key}:${value}</br>`;
-        if(key=="wfreq"){
-            buildGauge(value);
-            console.log("gauge value is:" +value);
-        }
-        
-    });
-    return str;
-}
-
-function displayHBarChart(option,dataSet) {
+    //values for hover labels
+    var otuLabels = []
+      otuLabels.push(individualSample.otu_labels);
+      var top1OotuLabels = otuLabels[0].slice(0, 10).reverse();
     
-    var barData = dataSet.samples.filter(sample => sample.id == option);
-    console.log(barData);
-    
+    //-----------------------------------------------------
+    //-----------------------------------------------------
+    //          THIS SECTION IS FOR THE BAR CHART 
+    //-----------------------------------------------------
+    //-----------------------------------------------------
 
-    
-
-    var y = barData.map(row =>row.otu_ids);  
-    var y1 =[];
-
-    
-   
-    for(i=0;i<y[0].length;i++){
-        y1.push(`OTU ${y[0][i]}`);
-    }
-
-    var x = barData.map(row =>(row.sample_values));
-    var text = barData.map(row =>row.otu_labels);
-    
-
-    var trace = {
-        x:x[0].slice(0,10),
-        y:y1.slice(0,10),
-        text:text[0].slice(0,10),
-        type:"bar",
-        orientation:"h",
-        
+    var barTrace = {
+      x: top1Ootusamples,
+      y: top1OotuIDs.map(otu => `OTU ${otu}`),
+      type: "bar",
+      orientation: "h", //left/right bars instead of up/down
+      text: top1OotuLabels //this is for the hover text
     };
 
-    var data = [trace];
+    var barData = [barTrace];
 
-    var layout = {
-        yaxis: {
-            autorange: "reversed" 
-        }
-    }
-
-    
-
-    
-    Plotly.newPlot("bar",data,layout);
-}
-
-function displayBubbleChart(option,dataSet) {
-
-    var barData = dataSet.samples.filter(sample => sample.id == option);
-    console.log(barData); 
-
-    var x = barData.map(row =>row.otu_ids); 
-    var y = barData.map(row =>row.sample_values); 
-    var text = barData.map(row =>row.otu_labels);
-    var marker_size = barData.map(row =>row.sample_values);
-    var marker_color = barData.map(row =>row.otu_ids);
-    
-    console.log(x[0]);
-    console.log(y[0]);
-    console.log(text);
-    
-    var trace1 = {
-        x:x[0],
-        y:y[0],
-        text: text[0],
-        mode:"markers",
+    Plotly.newPlot("bar",barData);
+  
+    //-----------------------------------------------------
+    //-----------------------------------------------------
+    //       THIS SECTION IS FOR THE BUBBLE CHART 
+    //-----------------------------------------------------
+    //-----------------------------------------------------
+    var bubbleTrace = {
+      x: otuIDs[0],
+      y: sampleValues[0],
+      text: otuLabels[0], //this is for the hover text
+      mode: 'markers',
         marker: {
-            color: marker_color[0],
-            size: marker_size[0]
+          size: sampleValues[0], //size of bubbles
+          color: otuIDs[0] //color of bubbles
         }
-        
     };
-
-    var data = [trace1];
 
     var layout = {
-        xaxis:{
-            title: "OTU ID"
-        }
-
+      xaxis: {
+        title: "OTU ID",
+        autotick: false,
+        dtick: "500"
+      },
+      showlegend: false,
+      height: 600,
+      width: 1200
     };
 
-    Plotly.newPlot("bubble",data,layout);
+    var bubbleData = [bubbleTrace];
 
+    Plotly.newPlot("bubble",bubbleData, layout);
+    
+  });
+} //close plotCharts
+
+function resetHtml() {
+  demoTable.html("");
 }
 
-
+function optionChanged(id) {
+  plotCharts(id); //updates chart when drop down option is changed
+}
 
 init();
