@@ -1,2 +1,4 @@
 # plotly-challenge
-- To Do: Load Data
+- To Do: Load Data -- Completed! 
+    - Where is the Gauge?  
+
